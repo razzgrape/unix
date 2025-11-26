@@ -50,9 +50,6 @@ if [ ! -f "$SRC_FILE" ]; then
 fi
 
 trap cleanup EXIT
-trap 'cleanup; exit 129' INT  
-trap 'cleanup; exit 130' TERM 
-trap 'cleanup; exit 143' HUP  
 
 TEMP_DIR=$(mktemp -d -t build.XXXXXX)
 
