@@ -14,7 +14,7 @@ cleanup() {
     if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
         # echo "Временный каталог $TEMP_DIR удален." >&2
-    fi
+    fi  
 }
 
 get_compiler_and_ext() {
@@ -50,6 +50,8 @@ if [ ! -f "$SRC_FILE" ]; then
 fi
 
 trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
 
 TEMP_DIR=$(mktemp -d -t build.XXXXXX)
 
