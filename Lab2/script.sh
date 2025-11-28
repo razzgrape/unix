@@ -2,14 +2,15 @@
 
 SHARED_DIR="/shared_volume"
 LOCK_FILE="${SHARED_DIR}/lockfile.lock"
-CID=$(cat /proc/sys/kernel/random/uuid | cut -c 1-8)
+CID=$RANDOM
 COUNTER=0
 
 while true; do
 
-    (
+    CREATED_FILENAME="" 
+    
+    {
         flock -x 666
-
         FILE_NAME=""
         for i in $(seq -w 1 999); do
             if [ ! -f "${SHARED_DIR}/${i}.txt" ]; then
@@ -22,20 +23,17 @@ while true; do
             COUNTER=$((COUNTER + 1))
             CONTENT="${CID} ${COUNTER}"
             echo "$CONTENT" > "${SHARED_DIR}/${FILE_NAME}"
-            echo "[+] Created: ${FILE_NAME} (${COUNTER})"
+            CREATED_FILENAME="${SHARED_DIR}/${FILE_NAME}"
+            echo "[+] Created: ${FILE_NAME} (${COUNTER}) by ${CID}"
         fi
-
-    ) 200>"${LOCK_FILE}"
+     } 666>"${LOCK_FILE}"
 
     sleep 1
 
-    TO_REMOVE=$(ls -1 "${SHARED_DIR}" | grep '^[0-9]' | head -1)
-
-    if [ -n "$TO_REMOVE" ] && [ "$TO_REMOVE" != "lockfile.lock" ]; then
-        rm "${SHARED_DIR}/${TO_REMOVE}"
-        echo "[-] Deleted: ${TO_REMOVE}"
+    if [ -n "$CREATED_FILENAME" ]; then
+        rm -f "$CREATED_FILENAME"
+        echo "[-] Deleted: $(basename "$CREATED_FILENAME") by ${CID}"
     fi
 
     sleep 1
-
 done
