@@ -1,10 +1,8 @@
 services:
-  competitive-app:
-    build: .
-    volumes:
-      - lab2_volume:/shared_volume
+  competitive-app: 
+    build: . 
+    volumes: 
+      - lab2_volume:/shared_volume 
     restart: always
-    
 volumes:
-  lab2_volume:
-    external: true
+  lab2_volume: 
