@@ -15,7 +15,7 @@ void* producer_thread(void* arg) {
 
         shared_data = i; 
         event_ready = 1;
-        printf("-> **[Поставщик]** Событие #%d инициировано. (Данные: %d)\n", i, shared_data);
+        printf("-> **[Поставщик]** Событие #%d. (Данные: %d)\n", i, shared_data);
 
         pthread_cond_signal(&cond_var); 
         
@@ -33,7 +33,7 @@ void* consumer_thread(void* arg) {
         }
         
         int received_data = shared_data;
-        printf("<- **[Потребитель]** Событие #%d получено и обработано. (Прочитанные данные: %d)\n", i, received_data);
+        printf("<- **[Потребитель]** Событие #%d получено. (Прочитанные данные: %d)\n", i, received_data);
         
         event_ready = 0;
 
