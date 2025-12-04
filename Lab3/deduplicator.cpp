@@ -76,31 +76,27 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Начало поиска дубликатов в: " << working_directory_path << "\n";
 
-    try {
-        for (const auto& directory_entry : fs::recursive_directory_iterator(working_directory_path)) {
+    for (const auto& directory_entry : fs::recursive_directory_iterator(working_directory_path)) {
 
-            if (!fs::is_regular_file(directory_entry)) continue;
+        if (!fs::is_regular_file(directory_entry)) continue;
 
-            fs::path current_file_path = directory_entry.path();
+        fs::path current_file_path = directory_entry.path();
 
-            std::string file_hash = calculate_file_fingerprint(current_file_path);
-            if (file_hash.empty()) continue;
+        std::string file_hash = calculate_file_fingerprint(current_file_path);
+        if (file_hash.empty()) continue;
 
-            if (hash_map_storage.count(file_hash)) {
-                const fs::path& original_path = hash_map_storage.at(file_hash);
+        if (hash_map_storage.count(file_hash)) {
+            const fs::path& original_path = hash_map_storage.at(file_hash);
                 
-                std::cout << "Дубликат найден: " << current_file_path << " совпадает с " << original_path << "\n";
+            std::cout << "Дубликат найден: " << current_file_path << " совпадает с " << original_path << "\n";
                 
-                replace_file_with_hardlink(original_path, current_file_path);
-            }
-            else {
-                hash_map_storage[file_hash] = current_file_path;
-            }
+            replace_file_with_hardlink(original_path, current_file_path);
         }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Произошла ошибка файловой системы при обходе: " << e.what() << "\n";
-        return 2;
+        else {
+            hash_map_storage[file_hash] = current_file_path;
+        }
     }
+    
     std::cout << "--- Программа завершена. ---" << "\n";
     return 0;
 }   
