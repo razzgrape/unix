@@ -8,7 +8,8 @@ int event_ready = 0;
 int shared_data = 0;         
 
 void* producer_thread(void* arg) {
-    for (int i = 1; i <= 5; ++i) {
+    int i = 1;
+    while (1) { 
         sleep(1); 
 
         pthread_mutex_lock(&mutex_var); 
@@ -20,12 +21,14 @@ void* producer_thread(void* arg) {
         pthread_cond_signal(&cond_var); 
         
         pthread_mutex_unlock(&mutex_var);
+        i++; 
     }
     return NULL;
 }
 
 void* consumer_thread(void* arg) {
-    for (int i = 1; i <= 5; ++i) {
+    int i = 1;
+    while (1) { 
         pthread_mutex_lock(&mutex_var); 
 
         while (event_ready == 0) {
@@ -38,6 +41,7 @@ void* consumer_thread(void* arg) {
         event_ready = 0;
 
         pthread_mutex_unlock(&mutex_var);
+        i++; 
     }
     return NULL;
 }
