@@ -7,7 +7,7 @@ import random
 from loguru import logger
 from aiokafka import AIOKafkaConsumer
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 TASK_TOPIC = os.getenv("TASK_TOPIC", "tasks_topic")
 
 CONSUMER_GROUP_ID = os.getenv("CONSUMER_GROUP_ID", "financial_analysis_workers")
