@@ -1,143 +1,130 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/socket.h>
+#include <iostream>   
+#include <vector>     
+#include <algorithm>  
+#include <cstring>
+#include <csignal> 
+#include <unistd.h> 
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <sys/select.h> 
 #include <netinet/in.h>
-#include <signal.h>
+#include <fcntl.h> 
 #include <errno.h>
-#include <sys/select.h>
+using namespace std;
 
-#define PORT 6666
-#define BUFFER_SIZE 256
-
-volatile sig_atomic_t wasSigHup = 0;
-int accepted_client_fd = -1;
+const int PORT = 7777; 
+volatile int wasSigHup = 0;
 
 void sigHupHandler(int r) {
-    wasSigHup = 1; 
-}
+    wasSigHup = 1;
+}   
 
-int setup_server_socket() {
-    int server_fd;
-    struct sockaddr_in address; 
+int main() {
+    int listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); 
+    if (listenSocket < 0) { 
+        perror("socket");
+        return 1;
+    }   
     int opt = 1;
+    setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
-    
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-    
-    bind(server_fd, (struct sockaddr *)&address, sizeof(address));
-    listen(server_fd, 3);
-    
-    printf("Listening on port %d. FD %d\n", PORT, server_fd);
-    return server_fd;
-}
+    struct sockaddr_in addr; 
+    addr.sin_family = AF_INET; 
+    addr.sin_port = htons(PORT); 
+    addr.sin_addr.s_addr = INADDR_ANY; 
+        
+    if (bind(listenSocket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        return 1;
+    }
 
-void register_signal_handler() {
-    struct sigaction sa;
-    sigaction(SIGHUP, NULL, &sa);
-    sa.sa_handler = sigHupHandler;
-    sa.sa_flags = 0; 
-    sigaction(SIGHUP, &sa, NULL);
-    printf("SIGHUP handler registered.\n");
-}
+    if (listen(listenSocket, 1) < 0) {
+        perror("listen");
+        return 1;
+    }
 
-void block_signal(sigset_t *origMask) {
-    sigset_t blockedMask;
+    cout << "Сервер запущен на порту " << PORT << ". PID: " << getpid() << endl;
+    cout << "Для проверки сигнала выполните: kill -HUP " << getpid() << endl;
+
+    sigset_t blockedMask, origMask;
     sigemptyset(&blockedMask);
     sigaddset(&blockedMask, SIGHUP);
-    sigprocmask(SIG_BLOCK, &blockedMask, origMask);
-    printf("SIGHUP blocked. Ready to run pselect().\n");
-}
+    sigprocmask(SIG_BLOCK, &blockedMask, &origMask); 
 
-void main_loop(int server_fd, const sigset_t *origSigMask) {
-    int max_fd = server_fd;
-    
-    while (1) {
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(server_fd, &fds);
-        
-        if (accepted_client_fd != -1) {
-            FD_SET(accepted_client_fd, &fds); 
+    struct sigaction sa; 
+    memset(&sa, 0, sizeof(sa)); 
+    sa.sa_handler = sigHupHandler;
+    sa.sa_flags = 0; 
+    sigaction(SIGHUP, &sa, NULL);  
+    int clientSock = -1;
 
-            if (server_fd > accepted_client_fd) {
-                max_fd = server_fd;
-            } 
-            else {
-                max_fd = accepted_client_fd;
+    while (true) {
+        fd_set readfds;
+        FD_ZERO(&readfds);
+
+        FD_SET(listenSocket, &readfds); 
+        int maxFd = listenSocket; 
+
+        if (clientSock != -1) { 
+            FD_SET(clientSock, &readfds);
+
+            if (clientSock > maxFd) {
+                maxFd = clientSock; 
             }
-        } 
-        else {
-            max_fd = server_fd;
         }
 
-        int activity = pselect(max_fd + 1, &fds, NULL, NULL, NULL, origSigMask);
+        int ready = pselect(maxFd + 1, &readfds, NULL, NULL, NULL, &origMask);
 
-        if (activity == -1) {
-            if (errno == EINTR) { 
+        if (ready == -1) {  
+            if (errno == EINTR) {   
+                
                 if (wasSigHup) {
-                    wasSigHup = 0;
-                    printf("SIGHUP received\n");
-                }
-            } 
-            else {
+                    cout << "[SIGNAL] Получен сигнал SIGHUP!" << endl;
+                    wasSigHup = 0; 
+                } 
+                continue;
+            } else {
                 perror("pselect");
                 break;
             }
         }
-        
-        if (FD_ISSET(server_fd, &fds)) {
-            struct sockaddr_in client_address;
-            socklen_t addrlen = sizeof(client_address);
-            
-            int new_socket = accept(server_fd, (struct sockaddr *)&client_address, &addrlen);
-            
-            printf("New connection on FD %d.\n", new_socket);
-            
-            if (accepted_client_fd == -1) {
-                accepted_client_fd = new_socket;
-                printf("Connection accepted.\n");
-            } 
-            else {
-                printf("Connection rejected. Closing FD %d.\n", new_socket);
-                close(new_socket);
-            }
+
+        if (wasSigHup) {
+            cout << "[SIGNAL] Получен сигнал SIGHUP (смешанный)!" << endl;
+            wasSigHup = 0;
         }
-        
-        if (accepted_client_fd != -1 && FD_ISSET(accepted_client_fd, &fds)) {
-            char buffer[BUFFER_SIZE];
-            ssize_t valread = read(accepted_client_fd, buffer, BUFFER_SIZE - 1);
-            
-            if (valread > 0) {
-                printf("Data received from FD %d. Bytes: %zd\n", accepted_client_fd, valread);
-            } 
-            else {
-                printf("Client disconnected. Closing FD %d.\n", accepted_client_fd);
-                close(accepted_client_fd);
-                accepted_client_fd = -1;
+
+        if (FD_ISSET(listenSocket, &readfds)) { 
+            int newSock = accept(listenSocket, NULL, NULL);
+            if (newSock >= 0) { 
+                if (clientSock == -1) {
+                    clientSock = newSock;
+                    cout << "[NET] Новое соединение принято (Socket " << newSock << ")" << endl;
+                } else {
+                    cout << "[NET] Клиент занят, соединение отклонено" << endl;
+                    close(newSock);
+                }
+            } else {
+                perror("accept");
+            }
+
+        }
+
+        if (clientSock != -1 && FD_ISSET(clientSock, &readfds)) { 
+            char buffer[1024];
+            int bytesRead = read(clientSock, buffer, sizeof(buffer));
+
+            if (bytesRead > 0) {
+                cout << "[DATA] Получено байт: " << bytesRead << endl;
+            } else {
+                cout << "[NET] Клиент отключился" << endl;
+                close(clientSock);
+                clientSock = -1; 
             }
         }
     }
-}
 
-int main() {
-    sigset_t origSigMask;
-
-    int server_fd = setup_server_socket();
-
-    register_signal_handler();
-
-    block_signal(&origSigMask);
-
-    main_loop(server_fd, &origSigMask);
-
-    if (accepted_client_fd != -1) close(accepted_client_fd);
-    close(server_fd);
-
-    sigprocmask(SIG_SETMASK, &origSigMask, NULL);
-
+    if (clientSock != -1) close(clientSock);
+    close(listenSocket);
     return 0;
 }
