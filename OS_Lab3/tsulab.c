@@ -23,8 +23,7 @@ static int tsu_show(struct seq_file *m, void *v) {
     u64 now_sec = ktime_get_real_seconds();
     u64 seconds_passed = now_sec - LAST_PERIHELION_TIMESTAMP;
     
-    u64 current_cycle_seconds = seconds_passed;
-    u64 total_cycles = div_u64_rem(current_cycle_seconds, HALLEY_PERIOD_SECONDS, &current_cycle_seconds); 
+    u64 current_cycle_seconds = seconds_passed % HALLEY_PERIOD_SECONDS; 
     
     u64 percentage_scaled_10000 = (current_cycle_seconds * 10000LL);
     do_div(percentage_scaled_10000, HALLEY_PERIOD_SECONDS);
