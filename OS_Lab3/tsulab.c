@@ -17,7 +17,6 @@ static struct proc_dir_entry *proc_file;
 #define HALLEY_PERIOD_DAYS (76LL * 365LL + 19LL)
 #define HALLEY_PERIOD_SECONDS (HALLEY_PERIOD_DAYS * 86400LL)
 
-// 9 февраля 1986, 12:00:00 UTC
 #define LAST_PERIHELION_TIMESTAMP 508248000LL 
 
 static int tsu_show(struct seq_file *m, void *v) {
