@@ -3,6 +3,9 @@
 #include <linux/proc_fs.h>  
 #include <linux/seq_file.h> 
 #include <linux/slab.h>     
+#include <linux/timekeeping.h>
+#include <linux/jiffies.h>
+#include <linux/math64.h> 
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Tomsk State University Student");
@@ -11,21 +14,34 @@ MODULE_DESCRIPTION("Module with /proc interface for the Halley's Comet task.");
 #define PROCFS_NAME "tsulab" 
 static struct proc_dir_entry *proc_file; 
 
-#define HALLEY_PERIOD_YEARS 76
-#define LAST_PERIHELION_YEAR 1986
-#define CURRENT_YEAR 2025 
+#define HALLEY_PERIOD_DAYS (76LL * 365LL + 19LL)
+#define HALLEY_PERIOD_SECONDS (HALLEY_PERIOD_DAYS * 86400LL)
+
+// 9 февраля 1986, 12:00:00 UTC
+#define LAST_PERIHELION_TIMESTAMP 508248000LL 
 
 static int tsu_show(struct seq_file *m, void *v) {
-    int years_passed = CURRENT_YEAR - LAST_PERIHELION_YEAR;
-    int percentage_scaled = (years_passed * 1000) / HALLEY_PERIOD_YEARS; 
+    u64 now_sec = ktime_get_real_seconds();
+    u64 seconds_passed = now_sec - LAST_PERIHELION_TIMESTAMP;
     
-    int whole_part = percentage_scaled / 10;
-    int fractional_part = percentage_scaled % 10;
+    u64 current_cycle_seconds = seconds_passed;
+    u64 total_cycles = div_u64_rem(current_cycle_seconds, HALLEY_PERIOD_SECONDS, &current_cycle_seconds); 
+    
+    u64 percentage_scaled_10000 = (current_cycle_seconds * 10000LL);
+    do_div(percentage_scaled_10000, HALLEY_PERIOD_SECONDS);
+
+    u64 whole_part = percentage_scaled_10000 / 100;
+    u64 fractional_part = percentage_scaled_10000 % 100;
+
+    u64 years_passed = seconds_passed;
+    do_div(years_passed, (365LL * 86400LL));
 
     seq_printf(m, "--- Tomsk State University Lab ---\n");
-    seq_printf(m, "Прошло %d лет с последнего перегелия (1986).\n", years_passed);
-    seq_printf(m, "Период обращения кометы Галлея: %d лет.\n", HALLEY_PERIOD_YEARS);
-    seq_printf(m, "Комета Галлея пролетела %d.%d%% своего круга между перегелиями.\n", whole_part, fractional_part);
+    seq_printf(m, "Прошло %llu секунд с последнего перигелия.\n", seconds_passed);
+    seq_printf(m, "Текущий цикл (UTC): %llu (дней) / %llu (дней)\n", 
+               current_cycle_seconds / 86400LL, HALLEY_PERIOD_DAYS);
+    seq_printf(m, "Комета Галлея пролетела %llu.%02llu%% своего круга между перегелиями.\n", 
+               whole_part, fractional_part);
     seq_printf(m, "--- End of TSU Lab Data ---\n");
     
     return 0;
